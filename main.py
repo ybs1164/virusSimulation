@@ -7,6 +7,6 @@ import objects.map as map
 m = map.Map()
 fig = m.GetFigure()
 
-anime = FuncAnimation(fig, m.update, interval=100, init_func=m.init)
+anime = FuncAnimation(fig, m.update, interval=60, init_func=m.init)
 plt.show()
 
