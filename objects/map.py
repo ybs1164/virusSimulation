@@ -4,7 +4,7 @@ from .students import student
 from . import wall
 
 class Map:
-    def __init__(self, w=10000, h=10000, count=100):
+    def __init__(self, w, h, count, incount, per=0.15):
         self.w = w
         self.h = h
 
@@ -12,7 +12,7 @@ class Map:
         self.infectionRaduis = 5. # 감염 거리
         self.studentSpeed = 100 # 이동 속도
 
-        for i in range(10): # 감염자 설정
+        for i in range(incount): # 감염자 설정
             self.students[i].GetInfection()
         
         self.drawer = Drawer(w, h, self.students, self.update)

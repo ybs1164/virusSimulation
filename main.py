@@ -1,4 +1,3 @@
 import objects.map as map
-from time import sleep
 
-m = map.Map()
+m = map.Map(10000, 10000, 10, 5)
