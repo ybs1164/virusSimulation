@@ -1,7 +1,9 @@
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from .students import student
 from . import wall
+from pyqtree import Index
 
 class Map:
     def __init__(self, w, h, count, incount, per=0.15):
@@ -9,8 +11,9 @@ class Map:
         self.h = h
 
         self.students = [student.Student(w, h) for _ in range(count)]
-        self.infectionRaduis = 5. # 감염 거리
-        self.studentSpeed = 100 # 이동 속도
+        self.infectionRadius = 3 # 감염 거리
+        self.studentSpeed = 1 # 이동 속도
+        self.infectionPercent = per
 
         for i in range(incount): # 감염자 설정
             self.students[i].GetInfection()
@@ -18,8 +21,18 @@ class Map:
         self.drawer = Drawer(w, h, self.students, self.update)
     
     def update(self):
-        for s in self.students:
+        qt = Index(bbox=(0, 0, self.w, self.h), max_items=5)
+
+        for i in range(len(self.students)):
+            s = self.students[i]
+            qt.insert(i, (s.x, s.y, s.x, s.y))
             s.update(self.studentSpeed, self.w, self.h)
+
+        for s in self.students:
+            if s.status == 1:
+                for i in qt.intersect((s.x-self.infectionRadius, s.y-self.infectionRadius, s.x+self.infectionRadius, s.y+self.infectionRadius)):
+                    if self.students[i].status == 0 and np.random.rand() < self.infectionPercent:
+                        self.students[i].status = 1
 
 class Drawer:
     def __init__(self, w, h, students, updateStudent):
