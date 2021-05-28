@@ -6,17 +6,23 @@ from . import wall
 from pyqtree import Index
 
 class Map:
-    def __init__(self, w, h, count, incount, per=0.15):
+    def __init__(self, w, h, count=1, incount=1, recount=0, per=0.15, radius=3, retime=60, speed=1):
         self.w = w
         self.h = h
 
         self.students = [student.Student(w, h) for _ in range(count)]
-        self.infectionRadius = 3 # 감염 거리
-        self.studentSpeed = 1 # 이동 속도
+        self.infectionRadius = radius # 감염 거리 - 주의, 이동 속도의 두 배 이상이어야 함
         self.infectionPercent = per
+        self.recoverTime = retime
+        self.studentSpeed = speed # 이동 속도
 
-        for i in range(incount): # 감염자 설정
-            self.students[i].GetInfection()
+        for i in range(incount + recount): # 감염자 설정
+            if i > count:
+                break
+            if i > incount:
+                self.students[i].status = 2
+            else:
+                self.students[i].GetInfection(self.recoverTime)
         
         self.drawer = Drawer(w, h, self.students, self.update)
     
@@ -32,7 +38,7 @@ class Map:
             if s.status == 1:
                 for i in qt.intersect((s.x-self.infectionRadius, s.y-self.infectionRadius, s.x+self.infectionRadius, s.y+self.infectionRadius)):
                     if self.students[i].status == 0 and np.random.rand() < self.infectionPercent:
-                        self.students[i].status = 1
+                        self.students[i].GetInfection(self.recoverTime)
 
 class Drawer:
     def __init__(self, w, h, students, updateStudent):

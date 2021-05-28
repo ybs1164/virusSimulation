@@ -8,8 +8,15 @@ class Student:
         self.dx = np.cos(dir)
         self.dy = np.sin(dir)
         self.status = 0
+        self.recoverTime = -1
 
     def update(self, speed, w, h):
+        if self.recoverTime > 0:
+            self.recoverTime -= 1
+        elif self.recoverTime == 0:
+            self.status = 2
+            self.recoverTime = -1
+
         self.x += self.dx * speed
         self.y += self.dy * speed
 
@@ -26,9 +33,10 @@ class Student:
             self.y=-self.y+h*2
             self.dy*=-1
     
-    def GetInfection(self):
+    def GetInfection(self, time):
         if self.status == 0:
-            self.status += 1
+            self.status = 1
+            self.recoverTime = time
             return True
         return False
     
