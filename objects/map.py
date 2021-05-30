@@ -6,20 +6,29 @@ from . import wall
 from pyqtree import Index
 
 class Map:
-    def __init__(self, w, h, count=100, incount=1, recount=0, per=0.15, radius=3, retime=60, speed=1):
+    def __init__(self, w, h, 
+                 count=100,
+                 incount=1,
+                 recount=0,
+                 per=0.15,
+                 radius=3,
+                 retime=60,
+                 speed=1,
+                 socialDistancing=False):
         self.w = w
         self.h = h
 
         self.students = [student.Student(self) for _ in range(count)]
         self.infectionRadius = radius # 감염 거리 - 주의, 이동 속도의 두 배 이상이어야 함
-        self.infectionPercent = per
-        self.recoverTime = retime
+        self.infectionPercent = per # 감염 확률
+        self.recoverTime = retime # 치유 시간
         self.studentSpeed = speed # 이동 속도
+        self.socialDistancing = socialDistancing # 사회적 거리두기
 
-        for i in range(incount + recount): # 감염자 설정
-            if i > count:
+        for i in range(incount + recount): # 감염자 & 완치자 설정
+            if i >= count:
                 break
-            if i > incount:
+            if i >= incount:
                 self.students[i].status = 2
             else:
                 self.students[i].GetInfection(self.recoverTime)
@@ -35,29 +44,28 @@ class Map:
             s.update(self.studentSpeed)
 
         for s in self.students:
-            distance = self.infectionRadius + 2
+            if self.socialDistancing: # 사회적 거리두기
+                distance = self.infectionRadius
 
-            for i in qt.intersect((s.x-distance, s.y-distance, s.x+distance, s.y+distance)):
-                other = self.students[i]
-                if np.sqrt((s.x-other.x)*(s.x-other.x)+(s.y-other.y)*(s.y-other.y))>distance:
-                    continue
-                    
-                if s != self.students[i]:
-                    direct = np.arctan2(s.y-self.students[i].y, s.x-self.students[i].x)
-                    s.dx += np.cos(direct) * 10
-                    s.dy += np.sin(direct) * 10
+                for i in qt.intersect((s.x-distance, s.y-distance, s.x+distance, s.y+distance)):
+                    other = self.students[i]
+                    if np.sqrt((s.x-other.x)*(s.x-other.x)+(s.y-other.y)*(s.y-other.y))>distance:
+                        continue
+                        
+                    if s != self.students[i]:
+                        direct = np.arctan2(s.y-self.students[i].y, s.x-self.students[i].x)
+                        s.dx += np.cos(direct) * 2
+                        s.dy += np.sin(direct) * 2
 
-            mag = np.sqrt(s.dx*s.dx+s.dy*s.dy)
-            s.dx /= mag
-            s.dy /= mag
+                mag = np.sqrt(s.dx*s.dx+s.dy*s.dy)
+                s.dx /= mag
+                s.dy /= mag
 
             for i in qt.intersect((s.x-self.infectionRadius, s.y-self.infectionRadius, s.x+self.infectionRadius, s.y+self.infectionRadius)):
                 other = self.students[i]
                 if np.sqrt((s.x-other.x)*(s.x-other.x)+(s.y-other.y)*(s.y-other.y))>self.infectionRadius:
                     continue
 
-                
-                
                 if s.status == 1 and self.students[i].status == 0 and np.random.rand() < self.infectionPercent:
                     self.students[i].GetInfection(self.recoverTime)
 
