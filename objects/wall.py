@@ -4,3 +4,6 @@ class Wall:
         self.y = y
         self.w = w
         self.h = h
+    
+    def GetBox(self):
+        return [self.x, self.y, self.x+self.w, self.y+self.h]

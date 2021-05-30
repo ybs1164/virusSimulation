@@ -8,13 +8,13 @@ from pyqtree import Index
 class Map:
     def __init__(self, w, h, 
                  count=100,
-                 incount=1,
+                 incount=0,
                  recount=0,
                  per=0.15,
                  radius=3,
-                 retime=60,
-                 speed=1,
-                 socialDistancing=False):
+                 retime=-1,
+                 speed=0.5,
+                 distanceRadius=0):
         self.w = w
         self.h = h
 
@@ -23,7 +23,12 @@ class Map:
         self.infectionPercent = per # 감염 확률
         self.recoverTime = retime # 치유 시간
         self.studentSpeed = speed # 이동 속도
-        self.socialDistancing = socialDistancing # 사회적 거리두기
+        self.distanceRadius = distanceRadius # 거리두기 거리
+
+        # result values
+        self.susceptibleCount = 0
+        self.infectiousCount = 0
+        self.recoveredCount = 0
 
         for i in range(incount + recount): # 감염자 & 완치자 설정
             if i >= count:
@@ -44,8 +49,8 @@ class Map:
             s.update(self.studentSpeed)
 
         for s in self.students:
-            if self.socialDistancing: # 사회적 거리두기
-                distance = self.infectionRadius
+            if self.distanceRadius > 0: # 사회적 거리두기
+                distance = self.distanceRadius
 
                 for i in qt.intersect((s.x-distance, s.y-distance, s.x+distance, s.y+distance)):
                     other = self.students[i]
@@ -66,7 +71,7 @@ class Map:
                 if np.sqrt((s.x-other.x)*(s.x-other.x)+(s.y-other.y)*(s.y-other.y))>self.infectionRadius:
                     continue
 
-                if s.status == 1 and self.students[i].status == 0 and np.random.rand() < self.infectionPercent:
+                if s.status == 1 and np.random.rand() < self.infectionPercent:
                     self.students[i].GetInfection(self.recoverTime)
 
 class Drawer:
@@ -87,9 +92,13 @@ class Drawer:
 
         ax.set_aspect('equal')
 
-        anime = FuncAnimation(fig, self.update, fargs=(students, updateStudent, ), interval=20, blit=True)
-        plt.show()
+        self.play = True
 
+        self.fig.canvas.mpl_connect('button_press_event', self.pause)
+
+        self.anime = FuncAnimation(fig, self.update, fargs=(students, updateStudent, ), interval=1000/60, blit=True)
+        plt.show()        
+        
     # 초기화 작업
     def init(self):
         self.susceptible.set_data([], [])
@@ -107,3 +116,13 @@ class Drawer:
         self.recovered.set_data([s.x for s in students if s.status == 2], [s.y for s in students if s.status == 2])
 
         return self.susceptible, self.infectious, self.recovered,
+
+    def pause(self, event):
+        if not event.dblclick:
+            return
+        if self.play:
+            self.anime.event_source.stop()
+            self.play = False
+        else:
+            self.anime.event_source.start()
+            self.play = True
