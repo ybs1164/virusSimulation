@@ -37,10 +37,11 @@ class Student:
             self.y=-self.y+self.map.h*2
             self.dy*=-1
     
-    def GetInfection(self, time):
-        if self.status == 0:
+    def GetInfection(self, time, reper):
+        if self.status == 0 or (self.status == 2 and np.random.rand() < reper):
             self.status = 1
             self.recoverTime = time
             return True
+            
         return False
     

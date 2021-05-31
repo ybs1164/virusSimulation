@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from .students import student
-from . import wall
+from . import student
+from . import area
 from pyqtree import Index
 
 class Map:
@@ -11,6 +11,7 @@ class Map:
                  incount=0,
                  recount=0,
                  per=0.15,
+                 reper=0,
                  radius=3,
                  retime=-1,
                  speed=0.5,
@@ -19,16 +20,22 @@ class Map:
         self.h = h
 
         self.students = [student.Student(self) for _ in range(count)]
+        
+        self.areas = []
+
         self.infectionRadius = radius # 감염 거리 - 주의, 이동 속도의 두 배 이상이어야 함
         self.infectionPercent = per # 감염 확률
+        self.reinfectionPercent = reper # 재감염 확률
         self.recoverTime = retime # 치유 시간
         self.studentSpeed = speed # 이동 속도
         self.distanceRadius = distanceRadius # 거리두기 거리
 
         # result values
-        self.susceptibleCount = 0
-        self.infectiousCount = 0
-        self.recoveredCount = 0
+        self.susceptibleCount = count - incount - recount
+        self.infectiousCount = incount
+        self.recoveredCount = recount
+
+        self.result = [(self.susceptibleCount, self.infectiousCount, self.recoveredCount)]
 
         for i in range(incount + recount): # 감염자 & 완치자 설정
             if i >= count:
@@ -36,9 +43,12 @@ class Map:
             if i >= incount:
                 self.students[i].status = 2
             else:
-                self.students[i].GetInfection(self.recoverTime)
+                self.students[i].GetInfection(self.recoverTime, 0)
         
+        self.logger = Logger(self.result, count)
         self.drawer = Drawer(w, h, self.students, self.update)
+
+        plt.show()
     
     def update(self):
         qt = Index(bbox=(0, 0, self.w, self.h), max_items=5)
@@ -72,7 +82,24 @@ class Map:
                     continue
 
                 if s.status == 1 and np.random.rand() < self.infectionPercent:
-                    self.students[i].GetInfection(self.recoverTime)
+                    self.students[i].GetInfection(self.recoverTime, self.reinfectionPercent)
+        
+        self.setLogData()
+    
+    def setLogData(self):
+        self.susceptibleCount = 0
+        self.infectiousCount = 0
+        self.recoveredCount = 0
+
+        for s in self.students:
+            if s.status == 0:
+                self.susceptibleCount += 1
+            elif s.status == 1:
+                self.infectiousCount += 1
+            elif s.status == 2:
+                self.recoveredCount += 1
+        
+        self.result.append((self.susceptibleCount, self.infectiousCount, self.recoveredCount))
 
 class Drawer:
     def __init__(self, w, h, students, updateStudent):
@@ -97,15 +124,6 @@ class Drawer:
         self.fig.canvas.mpl_connect('button_press_event', self.pause)
 
         self.anime = FuncAnimation(fig, self.update, fargs=(students, updateStudent, ), interval=1000/60, blit=True)
-        plt.show()        
-        
-    # 초기화 작업
-    def init(self):
-        self.susceptible.set_data([], [])
-        self.infectious.set_data([], [])
-        self.recovered.set_data([], [])
-        
-        return self.susceptible, self.infectious, self.recovered,
 
     # 프레임
     def update(self, frame, students, studentsMethod):
@@ -126,3 +144,33 @@ class Drawer:
         else:
             self.anime.event_source.start()
             self.play = True
+
+class Logger:
+    def __init__(self, value, count):
+        self.value = value
+
+        fig, ax = plt.subplots()
+        
+        self.fig = fig
+        self.ax = ax
+        
+        self.sgraph, = plt.plot([], [], 'b', ms=6) # 일반인
+        self.igraph, = plt.plot([], [], 'r', ms=6) # 감염자
+        self.rgraph, = plt.plot([], [], 'g', ms=6) # 완치자
+
+        ax.axes.xaxis.set_visible(False)
+
+         # 맵 크기 설정
+        ax.set_ylim(0, count)
+
+        self.play = True
+
+        self.anime = FuncAnimation(fig, self.update, interval=1000/60, blit=True)
+    
+    def update(self, frame):
+        self.ax.set_xlim(0, max(len(self.value), 200))
+
+        self.igraph.set_data(range(len(self.value)), [v[1] for v in self.value])
+        self.sgraph.set_data(range(len(self.value)), [v[1]+v[0] for v in self.value])
+
+        return self.sgraph, self.igraph, self.rgraph,  
