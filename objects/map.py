@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from . import student
+from .student import Person, Student, Eater, Waiting
 from . import area
 from pyqtree import Index
 
@@ -19,7 +19,7 @@ class Map:
         self.w = w
         self.h = h
 
-        self.students = [student.Student(self) for _ in range(count)]
+        self.people = [Person(self) for _ in range(count)]
         
         self.areas = []
 
@@ -27,7 +27,7 @@ class Map:
         self.infectionPercent = per # 감염 확률
         self.reinfectionPercent = reper # 재감염 확률
         self.recoverTime = retime # 치유 시간
-        self.studentSpeed = speed # 이동 속도
+        self.peopleSpeed = speed # 이동 속도
         self.distanceRadius = distanceRadius # 거리두기 거리
 
         # result values
@@ -41,34 +41,32 @@ class Map:
             if i >= count:
                 break
             if i >= incount:
-                self.students[i].status = 2
+                self.people[i].status = 2
             else:
-                self.students[i].GetInfection(self.recoverTime, 0)
+                self.people[i].GetInfection(self.recoverTime, 0)
         
         self.logger = Logger(self.result, count)
-        self.drawer = Drawer(w, h, self.students, self.update)
-
-        plt.show()
+        self.drawer = Drawer(w, h, self.people, self.update) # 자식에서 이 init 를 수행 시 자식에 있는 update 함수 가져와야 함
     
     def update(self):
         qt = Index(bbox=(0, 0, self.w, self.h), max_items=5)
 
-        for i in range(len(self.students)):
-            s = self.students[i]
+        for i in range(len(self.people)):
+            s = self.people[i]
             qt.insert(i, (s.x, s.y, s.x, s.y))
-            s.update(self.studentSpeed)
+            s.update(self.peopleSpeed)
 
-        for s in self.students:
+        for s in self.people:
             if self.distanceRadius > 0: # 사회적 거리두기
                 distance = self.distanceRadius
 
                 for i in qt.intersect((s.x-distance, s.y-distance, s.x+distance, s.y+distance)):
-                    other = self.students[i]
+                    other = self.people[i]
                     if np.sqrt((s.x-other.x)*(s.x-other.x)+(s.y-other.y)*(s.y-other.y))>distance:
                         continue
                         
-                    if s != self.students[i]:
-                        direct = np.arctan2(s.y-self.students[i].y, s.x-self.students[i].x)
+                    if s != self.people[i]:
+                        direct = np.arctan2(s.y-self.people[i].y, s.x-self.people[i].x)
                         s.dx += np.cos(direct) * 2
                         s.dy += np.sin(direct) * 2
 
@@ -77,12 +75,12 @@ class Map:
                 s.dy /= mag
 
             for i in qt.intersect((s.x-self.infectionRadius, s.y-self.infectionRadius, s.x+self.infectionRadius, s.y+self.infectionRadius)):
-                other = self.students[i]
+                other = self.people[i]
                 if np.sqrt((s.x-other.x)*(s.x-other.x)+(s.y-other.y)*(s.y-other.y))>self.infectionRadius:
                     continue
 
                 if s.status == 1 and np.random.rand() < self.infectionPercent:
-                    self.students[i].GetInfection(self.recoverTime, self.reinfectionPercent)
+                    self.people[i].GetInfection(self.recoverTime, self.reinfectionPercent)
         
         self.setLogData()
     
@@ -91,7 +89,7 @@ class Map:
         self.infectiousCount = 0
         self.recoveredCount = 0
 
-        for s in self.students:
+        for s in self.people:
             if s.status == 0:
                 self.susceptibleCount += 1
             elif s.status == 1:
@@ -102,7 +100,7 @@ class Map:
         self.result.append((self.susceptibleCount, self.infectiousCount, self.recoveredCount))
 
 class Drawer:
-    def __init__(self, w, h, students, updateStudent):
+    def __init__(self, w, h, people, updatePerson):
         fig, ax = plt.subplots()
         
         self.fig = fig
@@ -123,15 +121,15 @@ class Drawer:
 
         self.fig.canvas.mpl_connect('button_press_event', self.pause)
 
-        self.anime = FuncAnimation(fig, self.update, fargs=(students, updateStudent, ), interval=1000/60, blit=True)
+        self.anime = FuncAnimation(fig, self.update, fargs=(people, updatePerson, ), interval=1000/60, blit=True)
 
     # 프레임
-    def update(self, frame, students, studentsMethod):
-        studentsMethod()
+    def update(self, frame, people, peopleMethod):
+        peopleMethod()
 
-        self.susceptible.set_data([s.x for s in students if s.status == 0], [s.y for s in students if s.status == 0])
-        self.infectious.set_data([s.x for s in students if s.status == 1], [s.y for s in students if s.status == 1])
-        self.recovered.set_data([s.x for s in students if s.status == 2], [s.y for s in students if s.status == 2])
+        self.susceptible.set_data([s.x for s in people if s.status == 0], [s.y for s in people if s.status == 0])
+        self.infectious.set_data([s.x for s in people if s.status == 1], [s.y for s in people if s.status == 1])
+        self.recovered.set_data([s.x for s in people if s.status == 2], [s.y for s in people if s.status == 2])
 
         return self.susceptible, self.infectious, self.recovered,
 
@@ -173,4 +171,102 @@ class Logger:
         self.igraph.set_data(range(len(self.value)), [v[1] for v in self.value])
         self.sgraph.set_data(range(len(self.value)), [v[1]+v[0] for v in self.value])
 
-        return self.sgraph, self.igraph, self.rgraph,  
+        return self.sgraph, self.igraph, self.rgraph,
+
+# 교실 환경
+class ClassRoom(Map):
+    def __init__(self, count=28):
+        super().__init__(1000, 1000, count=count, radius=100)
+
+        self.people.clear()
+
+        self.count = count
+        self.outsides = [Student(self, i) for i in range(count)]
+        # 의자 위치
+        self.desk = [(i, j) for i in range(850, 0, -150) for j in range(100, 1000, 200)]
+        self.status = 1 # 0 : 수업시간 1: 쉬는시간
+
+        self.lessonTime = 300 # 수업시간
+        self.waitingTime = 600 # 쉬는시간
+        self.current = 0
+    
+    def update(self):
+        if self.status == 0:
+            for s in self.outsides:
+                # todo : 학생들 안으로 들어오기
+                pass
+            
+            for s in self.people:
+                s.fx = self.desk[s.number][1]
+                s.fy = self.desk[s.number][0]
+        else:
+            for s in self.people:
+                if s.type == 1:
+                    pass
+                elif s.type == 2:
+                    pass
+                elif s.type == 3:
+                    pass
+                elif s.type == 4:
+                    pass
+                else:
+                    pass
+            pass
+        
+        super().update()
+
+    def ChangeStatus(self):
+        self.status = 1 - self.status
+        if self.status == 1:
+            for s in self.people:
+                s.type = np.random.randint(1, 5)
+
+class LunchRoom(Map):
+    def __init__(self):
+        super().__init__(1000, 1000, count=200, speed=5, radius=20)
+
+        self.people.clear()
+
+        self.outside = [Eater(self) for _ in range(200)]
+
+        for s in self.outside:
+            s.x = 800
+            s.y = 0
+
+        self.outside[10].GetInfection(-1, 0)
+
+        self.waiting = [Waiting(100, 600 + i, 15) for i in range(0, 300, 10)] + [Waiting(100 + i, 900, 1) for i in range(0, 900, 10)]
+        
+        # todo : 가장 안쪽부터 차례대로 착석
+        self.desk = [[Waiting(i, j, 300) for i in range(200, 900, 40)] for j in range(200, 900, 40)]
+
+        self.intime = 15
+        self.current = 0
+    
+    def update(self):
+        if self.current >= self.intime and self.outside:
+            self.current = 0
+
+            person = self.outside.pop()
+            person.waitingNumber = len(self.waiting) - 1 
+            person.fx = self.waiting[person.waitingNumber].x
+            person.fy = self.waiting[person.waitingNumber].y
+
+            self.people.append(person)
+        else:
+            self.current += 1
+        
+        for s in self.people:
+            if s.MoveToPos(5, s.fx, s.fy):
+                if s.waitingNumber <= 0:
+                    pass
+                else:
+                    s.waitingNumber -= 1
+                    s.fx = self.waiting[s.waitingNumber].x
+                    s.fy = self.waiting[s.waitingNumber].y
+        
+
+
+        super().update()
+
+
