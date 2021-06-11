@@ -14,6 +14,6 @@ import objects.map as map
 
 #m = map.ClassRoom()
 
-m = map.LunchRoom2()
+m = map.LunchRoom()
 
 plt.show()

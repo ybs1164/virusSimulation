@@ -223,49 +223,92 @@ class ClassRoom(Map):
 
 class LunchRoom(Map):
     def __init__(self):
-        super().__init__(1000, 1000, count=200, speed=5, radius=20)
+        super().__init__(1000, 1000, count=200, speed=10, radius=40, per=0.005)
 
         self.people.clear()
 
         self.outside = [Eater(self) for _ in range(200)]
 
         for s in self.outside:
-            s.x = 800
+            s.x = 850
             s.y = 0
-
-        self.outside[10].GetInfection(-1, 0)
-
-        self.waiting = [Waiting(100, 600 + i, 15) for i in range(0, 300, 10)] + [Waiting(100 + i, 900, 1) for i in range(0, 900, 10)]
         
-        # todo : 가장 안쪽부터 차례대로 착석
-        self.desk = [[Waiting(i, j, 300) for i in range(200, 900, 40)] for j in range(200, 900, 40)]
+        self.outside[-100].GetInfection(-1, 0)
 
-        self.intime = 15
+        self.waiting = [Waiting(50, 400 - i, 10, True) for i in range(0, 300, 41)] + [Waiting(50 + i, 100, 1) for i in range(0, 800, 40)]
+        
+        before = None
+        for w in self.waiting:
+            if before:
+                w.SetNext(before)
+            before = w
+        
+        self.nextdesk = np.random.randint(0, 15)
+        # todo : 가장 안쪽부터 차례대로 착석
+        self.desks = [[Waiting(i, j, 300) for i in range(200, 800, 40)] for j in range(200, 900, 40)]
+
+        self.waiting[0].SetNext(self.desks[self.nextdesk][0])
+
+        self.exiting = [Waiting(950, i) for i in range(200, 900, 40)]
+
+        for i in range(len(self.desks)):
+            before = None
+            for d in self.desks[i]:
+                if before:
+                    before.SetNext(d)
+                before = d
+            before.SetNext(self.exiting[i])
+
+        self.exit = Waiting(950, 0)
+
+        for o in self.exiting:
+            o.SetNext(self.exit)
+
+        self.intime = 5
         self.current = 0
     
     def update(self):
-        if self.current >= self.intime and self.outside:
+        # 플레이어 맵 안으로 출입시키기
+        if self.current >= self.intime and self.outside and not self.waiting[-1].person:
             self.current = 0
 
             person = self.outside.pop()
-            person.waitingNumber = len(self.waiting) - 1 
-            person.fx = self.waiting[person.waitingNumber].x
-            person.fy = self.waiting[person.waitingNumber].y
+            person.targetw = self.waiting[0]
+            person.waiting = self.waiting[-1]
+            self.waiting[-1].SetPerson(person)
 
             self.people.append(person)
         else:
             self.current += 1
         
-        for s in self.people:
-            if s.MoveToPos(5, s.fx, s.fy):
-                if s.waitingNumber <= 0:
-                    pass
-                else:
-                    s.waitingNumber -= 1
-                    s.fx = self.waiting[s.waitingNumber].x
-                    s.fy = self.waiting[s.waitingNumber].y
+        for p in self.people:
+            if p.status == 2:
+                self.people.remove(p)
         
+        if self.waiting[0].person and self.waiting[0].person.isWait:
+            person = self.waiting[0].person
+            
+            while self.desks[self.nextdesk][0].isTarget:
+                self.nextdesk = np.random.randint(0, 15)
+            
+            self.waiting[0].SetNext(self.desks[self.nextdesk][0])
+            
+            person.waiting = self.desks[self.nextdesk][0]
+            self.desks[self.nextdesk][0].SetPerson(person)
 
+            person.targetw = self.desks[self.nextdesk][-1]
+
+            before = None
+            for d in self.desks[self.nextdesk]:
+                if d.isTarget == True:
+                    person.targetw = before
+                    break
+                before = d
+            
+            person.targetw.isTarget = True
+            self.waiting[0].person = None
+        
+        self.exit.person = None
 
         super().update()
 

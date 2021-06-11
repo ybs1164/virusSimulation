@@ -78,36 +78,83 @@ class Student(Person):
 class Eater(Person):
     def __init__(self, map):
         super().__init__(map)
-        self.fx = 0
-        self.fy = 0
 
-        self.waitingNumber = 0
-    
+        self.targetw = None
+
+        self.waiting = None
+        self.isWait = True
+
+        self.isFinish = False
+
     def update(self, speed):
         super().update(0)
-
-        self.MoveToPos(speed, self.fx, self.fy)
+        
+        if self.waiting:
+            if self.status == 2:
+                print(self.waiting)
+            self.isWait = self.MoveToPos(speed, self.waiting.x, self.waiting.y)
+            if self.isWait and self.waiting == self.map.exit:
+                self.waiting.person = None
+                self.targetw = None
+                self.waiting = None
+                # todo : logging
+                self.status = 2
+                return
+            if self.isWait and not self.waiting.next.person:
+                if self.targetw != self.waiting and not self.waiting.force:
+                    self.waiting.next.SetPerson(self)
+                    self.waiting.person = None
+                    self.waiting = self.waiting.next
+                    self.isWait = False
+                elif self.waiting.Check():
+                    self.isWait = True
+                    if self.targetw != self.waiting:
+                        self.waiting.next.SetPerson(self)
+                        self.waiting.person = None
+                        self.waiting = self.waiting.next
+                        self.isWait = False
+                    else:
+                        self.waiting.isTarget = False
+                        if self.waiting.time == 300:
+                            self.isFinish = True
+                            self.waiting.next.SetPerson(self)
+                            self.waiting.person = None
+                            self.waiting = self.waiting.next
+                            self.isWait = False
+                else:
+                    self.isWait = True
+        else:
+            self.isWait = True
 
 class Waiting:
-    def __init__(self, x, y, time):
+    def __init__(self, x, y, time=0, force=False):
         self.x = x
         self.y = y
         self.time = time
         self.current = 0
         self.person = None
+
+        self.isTarget = False
+
+        self.force = force
+
+        self.next = None
     
+    def SetNext(self, next):
+        self.next = next
+
     def SetPerson(self, person):
         self.person = person
         self.current = 0
 
     def Check(self):
         if not self.person:
-            return False
-        if self.x != self.person.x and self.y != self.person.y:
-            return False
+            return None
+        if not self.person.isWait:
+            return None
 
         if self.current < self.time:
             self.current += 1
-            return False
+            return None
         else:
-            return True
+            return self.next
